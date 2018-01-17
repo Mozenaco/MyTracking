@@ -1,3 +1,3 @@
 # MyTracking
 
-Project to show the user location, draw user moves and some interation.
+Project to show the user location, draw paths user moves and some interation.
