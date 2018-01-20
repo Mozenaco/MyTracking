@@ -1,10 +1,14 @@
 package andrade.mateus.mytracking.ui;
 
 import android.Manifest;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.location.Location;
-import android.location.LocationListener;
 import android.os.Build;
+import android.os.IBinder;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
@@ -19,27 +23,27 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 
 import andrade.mateus.mytracking.R;
+import andrade.mateus.mytracking.service.BackgroundLocationService;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.Disposable;
+import andrade.mateus.mytracking.service.BackgroundLocationService.LocalBinder;
 
 public class MainActivity extends FragmentActivity implements OnMapReadyCallback,
         GoogleApiClient.ConnectionCallbacks,
-        GoogleApiClient.OnConnectionFailedListener,
-        LocationListener {
+        GoogleApiClient.OnConnectionFailedListener {
 
     private GoogleMap mMap;
     private GoogleApiClient mGoogleApiClient;
-    private LocationRequest mLocationRequest;
-    private Location mLastLocation;
     private Marker mCurrLocationMarker;
     private FusedLocationProviderClient mFusedLocationProviderClient;
     private static final int DEFAULT_ZOOM = 15;
@@ -54,6 +58,28 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     private static final String TAG = "MainActivity";
     private final LatLng mDefaultLocation = new LatLng(0, 0);
 
+    //ServiceConnection to update in background location
+    private ServiceConnection serviceConnection;
+    private Disposable disposable;
+    private BackgroundLocationService mService;
+
+
+    private ServiceConnection mConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName className, IBinder iBinder) {
+            LocalBinder myBinder = (LocalBinder) iBinder;
+            mService = myBinder.getService();
+            disposable = mService.observePressure()
+                    .observeOn(AndroidSchedulers.mainThread())
+                    .subscribe(location -> updateLocation(location));
+            showCurrentLocationOnMap();
+        }
+        @Override
+        public void onServiceDisconnected(ComponentName arg0) {
+            Log.e(TAG, "onServiceDisconnected");
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -67,9 +93,6 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         mFusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this);
     }
 
-    /**
-     * Saves the state of the map when the activity is paused.
-     */
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         if (mMap != null) {
@@ -77,6 +100,23 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
             outState.putParcelable(KEY_LOCATION, mLastKnownLocation);
             super.onSaveInstanceState(outState);
         }
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+    }
+
+    /**
+     * Saves the state of the map when the activity is paused.
+     */
+
+    @Override
+    protected void onDestroy() {
+        if(disposable != null)
+            disposable.dispose();
+        unbindService(serviceConnection);
+        super.onDestroy();
     }
 
     @Override
@@ -103,6 +143,13 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         // Get the current location of the device and set the position of the map.
         getDeviceLocation();
 
+        // Create Intent Service
+        Intent launch = new Intent(this, BackgroundLocationService.class);
+        startService(launch);
+
+        // Binding to it
+        bindService(launch, mConnection, BIND_AUTO_CREATE);
+
     }
 
     private void getLocationPermission() {
@@ -127,6 +174,8 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
             return;
         }
         try {
+            // Prompt the user for permission.
+            getLocationPermission();
             if (mLocationPermissionGranted) {
                 mMap.setMyLocationEnabled(true);
                 mMap.getUiSettings().setMyLocationButtonEnabled(true);
@@ -135,8 +184,6 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
                 mMap.setMyLocationEnabled(false);
                 mMap.getUiSettings().setMyLocationButtonEnabled(false);
                 mLastKnownLocation = null;
-                // Prompt the user for permission.
-                getLocationPermission();
             }
         } catch (SecurityException e)  {
             Log.e("Exception: %s", e.getMessage());
@@ -178,10 +225,15 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         }
     }
 
+    public void updateLocation(Location l){
+        mLastKnownLocation = l;
+        showCurrentLocationOnMap();
+    }
+
     private void showCurrentLocationOnMap() {
         if(mLastKnownLocation == null)
             return;
-
+        mMap.clear();
         MarkerOptions markerOptions = new MarkerOptions();
         markerOptions.title("Current Position");
         markerOptions.position(new LatLng(mLastKnownLocation.getLatitude(),mLastKnownLocation.getLongitude()));
@@ -196,34 +248,6 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
                 .addApi(LocationServices.API)
                 .build();
         mGoogleApiClient.connect();
-    }
-
-    @Override
-    public void onLocationChanged(Location location) {
-        mLastLocation = location;
-        if (mCurrLocationMarker != null) {
-            mCurrLocationMarker.remove();
-        }
-
-        //Place current location marker
-        LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
-        MarkerOptions markerOptions = new MarkerOptions();
-        markerOptions.position(latLng);
-        markerOptions.title("Current Position");
-        //markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_MAGENTA));
-        mCurrLocationMarker = mMap.addMarker(markerOptions);
-
-        //move map camera
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
-        mMap.animateCamera(CameraUpdateFactory.zoomTo(DEFAULT_ZOOM));
-
-        //stop location updates
-//        if (mGoogleApiClient != null) {
-//            mFusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this);
-//            mFusedLocationProviderClient.removeLocationUpdates(mGoogleApiClient, this);
-//        }
-
-
     }
 
     @Override
@@ -244,47 +268,19 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     @Override
-    public void onStatusChanged(String s, int i, Bundle bundle) {
-
-    }
-
-    @Override
-    public void onProviderEnabled(String s) {
-
-    }
-
-    @Override
-    public void onProviderDisabled(String s) {
-
-    }
-
-    @Override
     public void onConnected(@Nullable Bundle bundle) {
-
-        mLocationRequest = new LocationRequest();
-        mLocationRequest.setInterval(1000);
-        mLocationRequest.setFastestInterval(1000);
-        mLocationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
-        if (ContextCompat.checkSelfPermission(this,
-                Manifest.permission.ACCESS_FINE_LOCATION)
-                == PackageManager.PERMISSION_GRANTED) {
-            //LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
-        }
-
+        Log.d(TAG, "onConnected");
     }
-
     @Override
     public void onConnectionSuspended(int i) {
-
+        Log.e(TAG, "onConnectionSuspended");
     }
-
     @Override
     public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
-
+        Log.e(TAG, "onConnectionFailed");
     }
-
     @Override
     public void onPointerCaptureChanged(boolean hasCapture) {
-
+        Log.d(TAG, "onPointerCaptureChanged");
     }
 }
