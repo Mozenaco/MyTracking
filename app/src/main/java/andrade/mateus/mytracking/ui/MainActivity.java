@@ -2,7 +2,6 @@ package andrade.mateus.mytracking.ui;
 
 import android.Manifest;
 import android.content.ComponentName;
-import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
@@ -16,6 +15,10 @@ import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
+import android.view.View;
+import android.widget.CompoundButton;
+import android.widget.Switch;
+import android.widget.Toast;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -32,15 +35,21 @@ import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 
+import java.util.Calendar;
+
 import andrade.mateus.mytracking.R;
+import andrade.mateus.mytracking.db.dao.CurrentLocationDAO;
 import andrade.mateus.mytracking.service.BackgroundLocationService;
+import butterknife.BindView;
+import butterknife.ButterKnife;
+import butterknife.OnCheckedChanged;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
 import andrade.mateus.mytracking.service.BackgroundLocationService.LocalBinder;
 
 public class MainActivity extends FragmentActivity implements OnMapReadyCallback,
         GoogleApiClient.ConnectionCallbacks,
-        GoogleApiClient.OnConnectionFailedListener {
+        GoogleApiClient.OnConnectionFailedListener{
 
     private GoogleMap mMap;
     private GoogleApiClient mGoogleApiClient;
@@ -49,20 +58,17 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     private static final int DEFAULT_ZOOM = 15;
     private static final int PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 1;
     private boolean mLocationPermissionGranted;
-
-    // The geographical location where the device is currently located. That is, the last-known
-    // location retrieved by the Fused Location Provider.
     private Location mLastKnownLocation;
     private static final String KEY_CAMERA_POSITION = "camera_position";
     private static final String KEY_LOCATION = "location";
     private static final String TAG = "MainActivity";
     private final LatLng mDefaultLocation = new LatLng(0, 0);
-
-    //ServiceConnection to update in background location
-    private ServiceConnection serviceConnection;
     private Disposable disposable;
     private BackgroundLocationService mService;
+    private CurrentLocationDAO currentLocationDAO;
+    private Boolean isRecordable = false;
 
+    @BindView(R.id.switchMap) Switch switchMap;
 
     private ServiceConnection mConnection = new ServiceConnection() {
         @Override
@@ -84,14 +90,28 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        ButterKnife.bind(this);
+        initializer();
+    }
+
+    private void initializer() {
+
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
 
-        // Construct a FusedLocationProviderClient.
         mFusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this);
+        currentLocationDAO = new CurrentLocationDAO(getApplicationContext());
+
+        switchMap.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                isRecordable = !isRecordable;
+                Toast.makeText(getApplicationContext(), R.string.recording, Toast.LENGTH_SHORT).show();
+            }
+        });
     }
+
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
@@ -115,7 +135,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     protected void onDestroy() {
         if(disposable != null)
             disposable.dispose();
-        unbindService(serviceConnection);
+        unbindService(mConnection);
         super.onDestroy();
     }
 
@@ -124,11 +144,11 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         mMap = googleMap;
         mMap.setMapType(GoogleMap.MAP_TYPE_NORMAL);
 
-        //Initialize Google Play Services
         if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (ContextCompat.checkSelfPermission(this,
                     Manifest.permission.ACCESS_FINE_LOCATION)
                     == PackageManager.PERMISSION_GRANTED) {
+
                 buildGoogleApiClient();
                 mMap.setMyLocationEnabled(true);
             }
@@ -143,13 +163,15 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         // Get the current location of the device and set the position of the map.
         getDeviceLocation();
 
+    }
+
+    private void startService(){
         // Create Intent Service
         Intent launch = new Intent(this, BackgroundLocationService.class);
         startService(launch);
 
         // Binding to it
         bindService(launch, mConnection, BIND_AUTO_CREATE);
-
     }
 
     private void getLocationPermission() {
@@ -228,6 +250,13 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     public void updateLocation(Location l){
         mLastKnownLocation = l;
         showCurrentLocationOnMap();
+        if(isRecordable) {
+            currentLocationDAO.saveLocation(l, Calendar.getInstance().getTime());
+            Log.i(TAG, "Location saved\n" +
+                    "Latitude: " + String.valueOf(l.getLatitude()) + "\n" +
+                    "Longitude: " + String.valueOf(l.getLatitude()) + "\n" +
+                    "Timestamp: " + String.valueOf(Calendar.getInstance().getTime()));
+        }
     }
 
     private void showCurrentLocationOnMap() {
@@ -261,6 +290,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
                 if (grantResults.length > 0
                         && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     mLocationPermissionGranted = true;
+                    startService();
                 }
             }
         }

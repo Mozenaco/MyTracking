@@ -13,7 +13,11 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+
     <application
+        android:name="com.orm.SugarApp"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -28,9 +32,12 @@
              sign the APK for publishing.
              You can define the keys for the debug and release targets in src/debug/ and src/release/.
         -->
-        <meta-data
-            android:name="com.google.android.geo.API_KEY"
+        <meta-data android:name="com.google.android.geo.API_KEY"
             android:value="@string/google_maps_key"/>
+        <meta-data android:name="DATABASE" android:value="mytracking.db" />
+        <meta-data android:name="VERSION" android:value="1" />
+        <meta-data android:name="QUERY_LOG" android:value="true" />
+        <meta-data android:name="DOMAIN_PACKAGE_NAME" android:value="andrade.mateus.mytracking" />
 
         <activity
             android:name=".ui.MainActivity"

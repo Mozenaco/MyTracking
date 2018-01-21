@@ -70,7 +70,11 @@ public class BackgroundLocationService extends Service {
         {
             Log.d(TAG, "onLocationChanged: " + location);
             mLastLocation.set(location);
-            locationObserver.onNext(mLastLocation);
+            try {
+                locationObserver.onNext(mLastLocation);
+            }catch (Exception e){
+                e.printStackTrace();
+            }
         }
 
         @Override
@@ -162,7 +166,8 @@ public class BackgroundLocationService extends Service {
     private void initializeLocationManager() {
         Log.e(TAG, "initializeLocationManager");
         if (mLocationManager == null) {
-            mLocationManager = (LocationManager) getApplicationContext().getSystemService(Context.LOCATION_SERVICE);
+            mLocationManager = (LocationManager) getApplicationContext()
+                    .getSystemService(Context.LOCATION_SERVICE);
         }
     }
 }

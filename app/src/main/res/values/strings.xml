@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">My Tracking</string>
     <string name="title_activity_main">My Tracking</string>
+    <string name="recording">Recording user’s movements...</string>
 </resources>
