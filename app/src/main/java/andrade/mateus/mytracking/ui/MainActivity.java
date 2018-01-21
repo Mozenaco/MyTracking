@@ -15,7 +15,6 @@ import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
-import android.view.View;
 import android.widget.CompoundButton;
 import android.widget.Switch;
 import android.widget.Toast;
@@ -32,24 +31,22 @@ import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.Task;
 
 import java.util.Calendar;
 
 import andrade.mateus.mytracking.R;
 import andrade.mateus.mytracking.db.dao.CurrentLocationDAO;
 import andrade.mateus.mytracking.service.BackgroundLocationService;
+import andrade.mateus.mytracking.service.DrawOnMap;
 import butterknife.BindView;
 import butterknife.ButterKnife;
-import butterknife.OnCheckedChanged;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
 import andrade.mateus.mytracking.service.BackgroundLocationService.LocalBinder;
 
 public class MainActivity extends FragmentActivity implements OnMapReadyCallback,
         GoogleApiClient.ConnectionCallbacks,
-        GoogleApiClient.OnConnectionFailedListener{
+        GoogleApiClient.OnConnectionFailedListener {
 
     private GoogleMap mMap;
     private GoogleApiClient mGoogleApiClient;
@@ -67,6 +64,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     private BackgroundLocationService mService;
     private CurrentLocationDAO currentLocationDAO;
     private Boolean isRecordable = false;
+    private DrawOnMap drawOnMap;
 
     @BindView(R.id.switchMap) Switch switchMap;
 
@@ -106,8 +104,10 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
 
         switchMap.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                isRecordable = !isRecordable;
-                Toast.makeText(getApplicationContext(), R.string.recording, Toast.LENGTH_SHORT).show();
+                isRecordable = isChecked;
+                if(isRecordable) {
+                    Toast.makeText(getApplicationContext(), R.string.recording, Toast.LENGTH_SHORT).show();
+                }
             }
         });
     }
@@ -119,6 +119,14 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
             outState.putParcelable(KEY_CAMERA_POSITION, mMap.getCameraPosition());
             outState.putParcelable(KEY_LOCATION, mLastKnownLocation);
             super.onSaveInstanceState(outState);
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if(mMap!=null&&mLastKnownLocation!=null) {
+            moveMapToCurrentPosition();
         }
     }
 
@@ -144,6 +152,8 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         mMap = googleMap;
         mMap.setMapType(GoogleMap.MAP_TYPE_NORMAL);
 
+        getLocationPermission();
+
         if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (ContextCompat.checkSelfPermission(this,
                     Manifest.permission.ACCESS_FINE_LOCATION)
@@ -157,12 +167,11 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
             mMap.setMyLocationEnabled(true);
         }
 
-        // Turn on the My Location layer and the related control on the map.
-        updateLocationUI();
+        if (mLocationPermissionGranted) {
+            startService();
+        }
 
-        // Get the current location of the device and set the position of the map.
-        getDeviceLocation();
-
+        drawOnMap = new DrawOnMap(mMap);
     }
 
     private void startService(){
@@ -201,7 +210,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
             if (mLocationPermissionGranted) {
                 mMap.setMyLocationEnabled(true);
                 mMap.getUiSettings().setMyLocationButtonEnabled(true);
-                getDeviceLocation();
+                //getDeviceLocation();
             } else {
                 mMap.setMyLocationEnabled(false);
                 mMap.getUiSettings().setMyLocationButtonEnabled(false);
@@ -212,62 +221,43 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         }
     }
 
-    private void getDeviceLocation() {
-        /*
-         * Get the best and most recent location of the device, which may be null in rare
-         * cases when a location is not available.
-         */
-        try {
-            if (mLocationPermissionGranted) {
-                Task<Location> locationResult = mFusedLocationProviderClient.getLastLocation();
-                locationResult.addOnCompleteListener(this, new OnCompleteListener<Location>() {
-                    @Override
-                    public void onComplete(@NonNull Task<Location> task) {
-                        if (task.isSuccessful()) {
-                            // Set the map's camera position to the current location of the device.
-                            mLastKnownLocation = task.getResult();
-                            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(
-                                    new LatLng(mLastKnownLocation.getLatitude(),
-                                            mLastKnownLocation.getLongitude()), DEFAULT_ZOOM));
-
-                            //Plot a market to display the user’s current location on a map
-                            showCurrentLocationOnMap();
-                        } else {
-                            Log.d(TAG, "Current location is null. Using defaults.");
-                            Log.e(TAG, "Exception: %s", task.getException());
-                            mMap.moveCamera(CameraUpdateFactory
-                                    .newLatLngZoom(mDefaultLocation, DEFAULT_ZOOM));
-                            mMap.getUiSettings().setMyLocationButtonEnabled(false);
-                        }
-                    }
-                });
-            }
-        } catch (SecurityException e)  {
-            Log.e("Exception: %s", e.getMessage());
-        }
-    }
-
-    public void updateLocation(Location l){
-        mLastKnownLocation = l;
+    public void updateLocation(Location currentLocation){
+        mLastKnownLocation = currentLocation;
         showCurrentLocationOnMap();
         if(isRecordable) {
-            currentLocationDAO.saveLocation(l, Calendar.getInstance().getTime());
+            currentLocationDAO.saveLocation(currentLocation, Calendar.getInstance().getTime());
             Log.i(TAG, "Location saved\n" +
-                    "Latitude: " + String.valueOf(l.getLatitude()) + "\n" +
-                    "Longitude: " + String.valueOf(l.getLatitude()) + "\n" +
+                    "Latitude: " + String.valueOf(currentLocation.getLatitude()) + "\n" +
+                    "Longitude: " + String.valueOf(currentLocation.getLatitude()) + "\n" +
                     "Timestamp: " + String.valueOf(Calendar.getInstance().getTime()));
         }
     }
 
     private void showCurrentLocationOnMap() {
-        if(mLastKnownLocation == null)
+        if (mLastKnownLocation == null)
             return;
-        mMap.clear();
+        if (mCurrLocationMarker != null) {
+            if (isRecordable) {
+                drawOnMap.drawLine(mCurrLocationMarker.getPosition(),
+                        new LatLng(mLastKnownLocation.getLatitude(), mLastKnownLocation.getLongitude()));
+            }
+            mCurrLocationMarker.setPosition(
+                    new LatLng(mLastKnownLocation.getLatitude(), mLastKnownLocation.getLongitude()));
+            return;
+        }
         MarkerOptions markerOptions = new MarkerOptions();
         markerOptions.title("Current Position");
-        markerOptions.position(new LatLng(mLastKnownLocation.getLatitude(),mLastKnownLocation.getLongitude()));
+        markerOptions.position(
+                new LatLng(mLastKnownLocation.getLatitude(),
+                        mLastKnownLocation.getLongitude()));
         mCurrLocationMarker = mMap.addMarker(markerOptions);
+        moveMapToCurrentPosition();
+    }
 
+    public void moveMapToCurrentPosition(){
+        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(
+                new LatLng(mLastKnownLocation.getLatitude(),
+                        mLastKnownLocation.getLongitude()), DEFAULT_ZOOM));
     }
 
     protected synchronized void buildGoogleApiClient() {
