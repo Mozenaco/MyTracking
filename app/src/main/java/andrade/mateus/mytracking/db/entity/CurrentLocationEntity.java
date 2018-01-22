@@ -17,17 +17,17 @@ public class CurrentLocationEntity extends SugarRecord<CurrentLocationEntity> im
     Double latitude;
     Double longitude;
     Long timeRecorded;
-    int journeyID;
+    Long journeyId;
 
 
     public CurrentLocationEntity(){
     }
 
-    public CurrentLocationEntity(Double latitude, Double longitude, Long timeRecorded, int journeyID) {
+    public CurrentLocationEntity(Double latitude, Double longitude, Long timeRecorded, Long journeyId) {
         this.latitude = latitude;
         this.longitude = longitude;
         this.timeRecorded = timeRecorded;
-        this.journeyID = journeyID;
+        this.journeyId = journeyId;
     }
 
     @Override
@@ -55,7 +55,12 @@ public class CurrentLocationEntity extends SugarRecord<CurrentLocationEntity> im
     }
 
     @Override
-    public int getJourneyID() {
-        return 0;
+    public Long getJourneyId() {
+        return this.journeyId;
+    }
+
+    @Override
+    public void setJourneyId(Long journeyId) {
+        this.journeyId = journeyId;
     }
 }

@@ -20,11 +20,12 @@ public class CurrentLocationDAO {
         this.context = context;
     }
 
-    public void saveLocation(Location location, Date now){
+    public void saveLocation(Location location, Date now, Long journeyId){
 
         CurrentLocationEntity currentLocationEntity = new CurrentLocationEntity();
         currentLocationEntity.setLocation(location);
         currentLocationEntity.setTimeRecorded(now);
+        currentLocationEntity.setJourneyId(journeyId);
         currentLocationEntity.save();
     }
 }

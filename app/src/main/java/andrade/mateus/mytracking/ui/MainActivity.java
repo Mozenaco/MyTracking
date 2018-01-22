@@ -36,10 +36,13 @@ import java.util.Calendar;
 
 import andrade.mateus.mytracking.R;
 import andrade.mateus.mytracking.db.dao.CurrentLocationDAO;
+import andrade.mateus.mytracking.db.dao.JourneyDAO;
+import andrade.mateus.mytracking.db.parse.DateConverter;
 import andrade.mateus.mytracking.service.BackgroundLocationService;
 import andrade.mateus.mytracking.service.DrawOnMap;
 import butterknife.BindView;
 import butterknife.ButterKnife;
+import butterknife.OnCheckedChanged;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
 import andrade.mateus.mytracking.service.BackgroundLocationService.LocalBinder;
@@ -63,8 +66,11 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     private Disposable disposable;
     private BackgroundLocationService mService;
     private CurrentLocationDAO currentLocationDAO;
+    private JourneyDAO journeyDAO;
     private Boolean isRecordable = false;
     private DrawOnMap drawOnMap;
+    private static Long currentJourneyId;
+    private static Long currentJourneyStartTime;
 
     @BindView(R.id.switchMap) Switch switchMap;
 
@@ -101,15 +107,33 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
 
         mFusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this);
         currentLocationDAO = new CurrentLocationDAO(getApplicationContext());
+        journeyDAO = new JourneyDAO(getApplicationContext());
+    }
 
-        switchMap.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                isRecordable = isChecked;
-                if(isRecordable) {
-                    Toast.makeText(getApplicationContext(), R.string.recording, Toast.LENGTH_SHORT).show();
-                }
-            }
-        });
+    @OnCheckedChanged(R.id.switchMap)
+    public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+        isRecordable = isChecked;
+        if(isRecordable) {
+            Toast.makeText(getApplicationContext(), R.string.recording, Toast.LENGTH_SHORT).show();
+            currentJourneyId = DateConverter.toTimestamp(Calendar.getInstance().getTime());
+            currentJourneyStartTime = currentJourneyId;
+        }else
+        {
+            journeyDAO.saveJourney(currentJourneyId, "",
+                    DateConverter.toDate(currentJourneyStartTime), Calendar.getInstance().getTime());
+            Log.i(TAG, "Journey saved\n" +
+                    "Start: " + currentJourneyStartTime + "\n" +
+                    "End: " + Calendar.getInstance().getTime() + "\n" +
+                    "Name: " + "" +
+                    "Journey ID: " + String.valueOf(currentJourneyId));
+
+            currentJourneyId = 0l;
+            currentJourneyStartTime = 0l;
+            Toast.makeText(getApplicationContext(), R.string.journey_saved, Toast.LENGTH_SHORT).show();
+            mMap.clear();
+            mCurrLocationMarker = null;
+            showCurrentLocationOnMap();
+        }
     }
 
 
@@ -210,7 +234,6 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
             if (mLocationPermissionGranted) {
                 mMap.setMyLocationEnabled(true);
                 mMap.getUiSettings().setMyLocationButtonEnabled(true);
-                //getDeviceLocation();
             } else {
                 mMap.setMyLocationEnabled(false);
                 mMap.getUiSettings().setMyLocationButtonEnabled(false);
@@ -225,11 +248,12 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         mLastKnownLocation = currentLocation;
         showCurrentLocationOnMap();
         if(isRecordable) {
-            currentLocationDAO.saveLocation(currentLocation, Calendar.getInstance().getTime());
+            currentLocationDAO.saveLocation(currentLocation, Calendar.getInstance().getTime(), currentJourneyId);
             Log.i(TAG, "Location saved\n" +
                     "Latitude: " + String.valueOf(currentLocation.getLatitude()) + "\n" +
                     "Longitude: " + String.valueOf(currentLocation.getLatitude()) + "\n" +
-                    "Timestamp: " + String.valueOf(Calendar.getInstance().getTime()));
+                    "Timestamp: " + String.valueOf(Calendar.getInstance().getTime() +
+                    "Journey ID: " + String.valueOf(currentJourneyId)));
         }
     }
 

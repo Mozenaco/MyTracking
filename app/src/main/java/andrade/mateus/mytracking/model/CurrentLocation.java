@@ -14,5 +14,6 @@ public interface CurrentLocation {
     void setLocation(Location location);
     Date getTimeRecorded();
     void setTimeRecorded(Date timeRecorded);
-    int getJourneyID();
+    Long getJourneyId();
+    void setJourneyId(Long journeyId);
 }
