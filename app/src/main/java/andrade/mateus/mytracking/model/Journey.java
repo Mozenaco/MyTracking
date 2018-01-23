@@ -10,6 +10,7 @@ import java.util.Date;
  */
 
 public interface Journey {
+
     Long getJourneyId();
     void setJourneyId(Long journeyId);
 

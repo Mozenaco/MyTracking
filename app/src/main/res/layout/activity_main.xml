@@ -8,24 +8,31 @@
         android:name="com.google.android.gms.maps.SupportMapFragment"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        tools:context="andrade.mateus.mytracking.ui.MainActivity" />
+        tools:context="andrade.mateus.mytracking.view.MainActivity" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:orientation="vertical"
         android:gravity="bottom">
 
         <Switch
             android:id="@+id/switchMap"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="50sp"
-            android:layout_weight="1"
             android:checked="false"
             android:padding="12sp"
             android:textStyle="bold"
             android:background="@android:color/white"
-            android:text="Tracking on/off"
+            android:text="@string/tracking_on_off"
             android:textSize="18sp" />
+
+        <Button
+            android:id="@+id/goToList"
+            android:layout_width="match_parent"
+            android:layout_height="60sp"
+            android:text="@string/list_of_journeys"/>
+
     </LinearLayout>
 
 </FrameLayout>

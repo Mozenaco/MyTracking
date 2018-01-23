@@ -1,4 +1,4 @@
-package andrade.mateus.mytracking.ui;
+package andrade.mateus.mytracking.view;
 
 import android.Manifest;
 import android.content.ComponentName;
@@ -15,6 +15,7 @@ import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
+import android.widget.Button;
 import android.widget.CompoundButton;
 import android.widget.Switch;
 import android.widget.Toast;
@@ -43,6 +44,7 @@ import andrade.mateus.mytracking.service.DrawOnMap;
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import butterknife.OnCheckedChanged;
+import butterknife.OnClick;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
 import andrade.mateus.mytracking.service.BackgroundLocationService.LocalBinder;
@@ -73,6 +75,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     private static Long currentJourneyStartTime;
 
     @BindView(R.id.switchMap) Switch switchMap;
+    @BindView(R.id.goToList) Button goToList;
 
     private ServiceConnection mConnection = new ServiceConnection() {
         @Override
@@ -136,6 +139,11 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         }
     }
 
+    @OnClick(R.id.goToList)
+    public void openJourneyList(){
+        Intent intent = new Intent(this, JourneyListActivity.class);
+        startActivity(intent);
+    }
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {

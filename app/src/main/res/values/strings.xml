@@ -3,4 +3,6 @@
     <string name="title_activity_main">My Tracking</string>
     <string name="recording">Recording user’s movements...</string>
     <string name="journey_saved">Journey saved with success</string>
+    <string name="tracking_on_off">Tracking on/off</string>
+    <string name="list_of_journeys">List of Journeys</string>
 </resources>

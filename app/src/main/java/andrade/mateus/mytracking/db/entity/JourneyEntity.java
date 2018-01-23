@@ -21,6 +21,9 @@ public class JourneyEntity extends SugarRecord<JourneyEntity> implements Journey
     private Long journeyStartTime;
     private Long journeyEndTime;
 
+    public JourneyEntity() {
+    }
+
     public Long getJourneyId() {
         return journeyId;
     }

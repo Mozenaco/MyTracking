@@ -4,6 +4,7 @@ import android.content.Context;
 import android.location.Location;
 
 import java.util.Date;
+import java.util.List;
 
 import andrade.mateus.mytracking.db.entity.CurrentLocationEntity;
 import andrade.mateus.mytracking.db.entity.JourneyEntity;
@@ -28,5 +29,9 @@ public class JourneyDAO {
         journeyEntity.setStartTime(journeyStartTime);
         journeyEntity.setEndTime(journeyEndTime);
         journeyEntity.save();
+    }
+
+    public List<JourneyEntity> listAll(){
+        return JourneyEntity.listAll(JourneyEntity.class);
     }
 }

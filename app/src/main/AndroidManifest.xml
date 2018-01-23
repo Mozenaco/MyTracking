@@ -40,7 +40,7 @@
         <meta-data android:name="DOMAIN_PACKAGE_NAME" android:value="andrade.mateus.mytracking" />
 
         <activity
-            android:name=".ui.MainActivity"
+            android:name=".view.MainActivity"
             android:label="@string/app_name">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
@@ -48,6 +48,10 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <activity
+            android:name=".view.JourneyListActivity"
+            android:label="@string/app_name"/>
+
         <service android:name=".service.BackgroundLocationService" />
     </application>
 
