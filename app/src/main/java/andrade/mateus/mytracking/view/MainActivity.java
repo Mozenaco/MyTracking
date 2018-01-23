@@ -59,7 +59,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     private FusedLocationProviderClient mFusedLocationProviderClient;
     private static final int DEFAULT_ZOOM = 15;
     private static final int PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 1;
-    private boolean mLocationPermissionGranted;
+    private boolean mLocationPermissionGranted = false;
     private Location mLastKnownLocation;
     private static final String KEY_CAMERA_POSITION = "camera_position";
     private static final String KEY_LOCATION = "location";
@@ -69,10 +69,12 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     private BackgroundLocationService mService;
     private CurrentLocationDAO currentLocationDAO;
     private JourneyDAO journeyDAO;
-    private Boolean isRecordable = false;
+    private Boolean isRecording = false;
     private DrawOnMap drawOnMap;
     private static Long currentJourneyId;
     private static Long currentJourneyStartTime;
+    private boolean mIsBound = false;
+    private Intent launch;
 
     @BindView(R.id.switchMap) Switch switchMap;
     @BindView(R.id.goToList) Button goToList;
@@ -115,8 +117,8 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
 
     @OnCheckedChanged(R.id.switchMap)
     public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-        isRecordable = isChecked;
-        if(isRecordable) {
+        isRecording = isChecked;
+        if(isRecording) {
             Toast.makeText(getApplicationContext(), R.string.recording, Toast.LENGTH_SHORT).show();
             currentJourneyId = DateConverter.toTimestamp(Calendar.getInstance().getTime());
             currentJourneyStartTime = currentJourneyId;
@@ -160,6 +162,9 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         if(mMap!=null&&mLastKnownLocation!=null) {
             moveMapToCurrentPosition();
         }
+        if(mLocationPermissionGranted&&!isRecording) {
+            startService();
+        }
     }
 
     @Override
@@ -175,8 +180,18 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     protected void onDestroy() {
         if(disposable != null)
             disposable.dispose();
-        unbindService(mConnection);
+        stopService();
         super.onDestroy();
+    }
+
+    @Override
+    protected void onPause() {
+        if(!isRecording) {
+            if (disposable != null)
+                disposable.dispose();
+            stopService();
+        }
+        super.onPause();
     }
 
     @Override
@@ -208,11 +223,20 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
 
     private void startService(){
         // Create Intent Service
-        Intent launch = new Intent(this, BackgroundLocationService.class);
+        launch = new Intent(this, BackgroundLocationService.class);
         startService(launch);
-
+        mIsBound = true;
         // Binding to it
         bindService(launch, mConnection, BIND_AUTO_CREATE);
+    }
+
+    private void stopService(){
+        if(mIsBound && (launch != null)) {
+
+            mService.stopLocationUpdates();
+            stopService(launch);
+            mIsBound = false;
+        }
     }
 
     private void getLocationPermission() {
@@ -255,7 +279,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     public void updateLocation(Location currentLocation){
         mLastKnownLocation = currentLocation;
         showCurrentLocationOnMap();
-        if(isRecordable) {
+        if(isRecording) {
             currentLocationDAO.saveLocation(currentLocation, Calendar.getInstance().getTime(), currentJourneyId);
             Log.i(TAG, "Location saved\n" +
                     "Latitude: " + String.valueOf(currentLocation.getLatitude()) + "\n" +
@@ -269,7 +293,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         if (mLastKnownLocation == null)
             return;
         if (mCurrLocationMarker != null) {
-            if (isRecordable) {
+            if (isRecording) {
                 drawOnMap.drawLine(mCurrLocationMarker.getPosition(),
                         new LatLng(mLastKnownLocation.getLatitude(), mLastKnownLocation.getLongitude()));
             }

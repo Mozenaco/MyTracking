@@ -163,6 +163,20 @@ public class BackgroundLocationService extends Service {
         }
     }
 
+    public void stopLocationUpdates() {
+
+        if (mLocationManager != null) {
+            for (int i = 0; i < mLocationListeners.length; i++) {
+                try {
+                    mLocationManager.removeUpdates(mLocationListeners[i]);
+                } catch (Exception ex) {
+                    Log.i(TAG, "fail to remove location listeners, ignore", ex);
+                }
+            }
+        }
+
+    }
+
     private void initializeLocationManager() {
         Log.e(TAG, "initializeLocationManager");
         if (mLocationManager == null) {
