@@ -231,7 +231,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     private void stopService(){
-        if(mIsBound && (launch != null)) {
+        if(mIsBound && (launch != null) && !isRecording) {
 
             mService.stopLocationUpdates();
             stopService(launch);
